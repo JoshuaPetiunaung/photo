@@ -1045,10 +1045,15 @@ html, body {
   height: 100%;
   object-fit: cover;
   object-position: center 20%;
+}
+.local-player-card video {
   transform: scaleX(-1);
 }
-.video-card video.unmirror {
+.local-player-card video.unmirror {
   transform: scaleX(1);
+}
+.remote-player-card video {
+  transform: none;
 }
 
 /* Photobooth Viewfinder Framing Overlay */
