@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="id" data-theme="girl">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📸</text></svg>" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>DUOBOOTH — Online Photobooth Berdua</title>
+    <meta name="description" content="Website Online Photobooth Gen-Z untuk menghubungkan 2 orang secara online, jepret foto bersama dengan bingkai aesthetic, countdown sinkron, dan download photo strip instan." />
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600;1,700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <!-- Dynamic Background Particle Canvas -->
+    <canvas id="bg-canvas"></canvas>
+
+    <!-- Shutter Screen Flash Overlay -->
+    <div id="flash-overlay" class="flash-overlay"></div>
+
+    <!-- App Container -->
+    <div id="app" class="app-container">
+      
+      <!-- Top Navigation Bar -->
+      <header class="navbar">
+        <div class="nav-brand">
+          <div class="brand-icon">📸</div>
+          <div class="brand-text">
+            <span class="brand-name">DUOBOOTH</span>
+            <span class="brand-tag">GEN-Z ONLINE PHOTOBOOTH</span>
+          </div>
+        </div>
+
+        <div class="nav-actions">
+          <!-- Room Status Badge (when in room) -->
+          <div id="nav-room-badge" class="room-pill-badge hidden">
+            <span class="status-dot pulse"></span>
+            <span id="nav-room-text">ROOM: <b>---</b></span>
+          </div>
+
+          <!-- Sound Mute/Unmute -->
+          <button id="btn-sound-toggle" class="icon-pill-btn" title="Toggle Suara Audio" aria-label="Toggle Sound">
+            <span id="sound-icon">🔊</span>
+          </button>
+
+          <!-- Theme Switcher Pill -->
+          <div class="theme-switcher-wrapper">
+            <div class="theme-switch" id="theme-switch" role="button" tabindex="0" title="Ganti Tema (Cewek/Cowok)">
+              <span class="theme-option girl-opt active" data-theme-val="girl">
+                <span class="theme-emoji">🌸</span>
+                <span class="theme-label">Dreamy Bloom</span>
+              </span>
+              <span class="theme-option boy-opt" data-theme-val="boy">
+                <span class="theme-emoji">⚡</span>
+                <span class="theme-label">Neon Grid</span>
+              </span>
+              <div class="theme-slider"></div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Dynamic Views -->
+      <main class="main-content">
+
+        <!-- ============================================== -->
+        <!-- VIEW 1: LOBBY / ROOM SETUP -->
+        <!-- ============================================== -->
+        <section id="view-lobby" class="view-section active">
+          <div class="hero-badge">✨ KONEKSI REAL-TIME 2 ORANG • BEBAS JARAK</div>
+          <h1 class="hero-title">
+            Abadikan Momen Berdua <br />
+            <span class="gradient-text">Lewat Photobooth Online</span>
+          </h1>
+          <p class="hero-subtitle">
+            Generate kode sesi unik, bagikan ke temanmu, dan ambil foto bareng langsung dari browser.
+            Pilih bingkai favorit atau upload langsung desain bingkai dari Pinterest!
+          </p>
+
+          <!-- Local Camera Permission Card -->
+          <div class="webcam-preview-box">
+            <div class="video-container">
+              <video id="lobby-video" autoplay playsinline muted></video>
+              <div id="lobby-cam-placeholder" class="cam-placeholder">
+                <div class="cam-icon">🎥</div>
+                <p>Kamera belum aktif</p>
+                <button id="btn-enable-cam" class="btn btn-secondary">
+                  Aktifkan Kamera Sekarang
+                </button>
+              </div>
+            </div>
+            <div class="cam-toolbar">
+              <!-- Desktop Camera Dropdown -->
+              <div class="cam-select-group cam-select-dropdown-wrapper">
+                <span class="cam-select-icon">📷</span>
+                <select id="select-camera-lobby" class="camera-select" title="Pilih Kamera Perangkat">
+                  <option value="">Memuat daftar kamera...</option>
+                </select>
+              </div>
+
+              <!-- Mobile Switch Camera Button (Front / Back) -->
+              <button id="btn-switch-cam-lobby" class="btn-switch-camera-mobile" title="Ganti Kamera Depan / Belakang" aria-label="Ganti Kamera Depan Belakang">
+                <span class="switch-icon">🔄</span>
+                <span id="label-switch-cam-lobby">Kamera Depan</span>
+              </button>
+
+              <div class="cam-tools-right">
+                <span id="cam-status-label" class="status-badge">Menunggu izin kamera</span>
+                <button id="btn-flip-cam" class="btn-micro" title="Mirror Kamera">🪞 Mirror</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Connection Action Cards -->
+          <div class="lobby-cards-grid">
+            <!-- Host Card -->
+            <div class="action-card host-card">
+              <div class="card-badge">👑 JADI HOST</div>
+              <h3>Bikin Sesi Baru</h3>
+              <p>Dapatkan kode room 6 digit dan kirim link undangan ke temanmu untuk bergabung.</p>
+              
+              <div id="host-idle-state">
+                <button id="btn-create-room" class="btn btn-primary btn-block">
+                  <span>Buat Kode Room</span>
+                  <span class="arrow-icon">➔</span>
+                </button>
+              </div>
+
+              <div id="host-active-state" class="host-active-box hidden">
+                <div class="room-code-display">
+                  <span class="code-label">KODE SESI KAMU</span>
+                  <div class="code-number-wrapper">
+                    <span id="display-room-code" class="code-number">----</span>
+                    <button id="btn-copy-code" class="btn-copy" title="Salin Kode">📋</button>
+                  </div>
+                </div>
+                
+                <div class="share-link-row">
+                  <input type="text" id="share-link-input" readonly value="" />
+                  <button id="btn-copy-link" class="btn btn-small">Salin Link</button>
+                </div>
+
+                <div class="waiting-indicator">
+                  <div class="spinner-orbit"></div>
+                  <span>Menunggu temanmu memasukkan kode...</span>
+                </div>
+
+                <div class="host-cancel-row">
+                  <button id="btn-cancel-create-room" class="btn btn-cancel-host">
+                    ✕ Batalkan Sesi
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Guest Card -->
+            <div class="action-card guest-card">
+              <div class="card-badge">🔗 JADI GUEST</div>
+              <h3>Gabung Room Teman</h3>
+              <p>Masukkan kode sesi dari temanmu untuk langsung terhubung dalam satu frame.</p>
+              
+              <div class="guest-input-form">
+                <div class="input-code-group">
+                  <input 
+                    type="text" 
+                    id="input-guest-code" 
+                    placeholder="Kode: VIBE-4821" 
+                    maxlength="12"
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                  <button id="btn-join-room" class="btn btn-accent">
+                    <span>Masuk</span>
+                    <span class="arrow-icon">➔</span>
+                  </button>
+                </div>
+                <div id="join-error-msg" class="error-msg hidden"></div>
+              </div>
+
+              <div class="tips-box">
+                <span class="tips-icon">💡</span>
+                <span>Pastikan kamu & temanmu mengizinkan akses kamera saat browser meminta.</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Solo Mode Alternative -->
+          <div class="solo-mode-wrapper">
+            <span class="divider-text">atau mau foto sendiri?</span>
+            <button id="btn-solo-mode" class="btn btn-solo">
+              <span>📸 Solo Foto</span>
+            </button>
+          </div>
+        </section>
+
+
+        <!-- ============================================== -->
+        <!-- VIEW 2: LIVE BOOTH ROOM (CONNECTED) -->
+        <!-- ============================================== -->
+        <section id="view-booth" class="view-section hidden">
+          <!-- Room Status Ribbon -->
+          <div class="booth-top-bar">
+            <div class="room-conn-status">
+              <span class="status-dot online"></span>
+              <span id="booth-conn-text">Terhubung Berdua • Sesi Aktif</span>
+            </div>
+            
+            <div class="booth-actions-row">
+              <!-- Desktop Camera Selector in Booth -->
+              <div class="cam-select-group booth-cam-select cam-select-dropdown-wrapper">
+                <span class="cam-select-icon">📷</span>
+                <select id="select-camera-booth" class="camera-select" title="Ganti Kamera">
+                  <option value="">Pilih Kamera...</option>
+                </select>
+              </div>
+
+              <!-- Mobile Switch Camera Button in Booth (Front / Back) -->
+              <button id="btn-switch-cam-booth" class="btn-switch-camera-mobile" title="Ganti Kamera Depan / Belakang" aria-label="Ganti Kamera Depan Belakang">
+                <span class="switch-icon">🔄</span>
+                <span id="label-switch-cam-booth">Kamera Depan</span>
+              </button>
+
+              <!-- Layout Toggle -->
+              <div id="layout-toggle-group" class="layout-toggle-group">
+                <button id="btn-layout-split" class="layout-btn active" title="Berdampingan (Split)">
+                  ⚸ Split Duo
+                </button>
+                <button id="btn-layout-pip" class="layout-btn" title="Picture in Picture">
+                  ▣ PiP
+                </button>
+              </div>
+
+              <button id="btn-leave-room" class="btn-danger-pill">
+                Keluar Sesi ✕
+              </button>
+            </div>
+          </div>
+
+          <!-- Video Feeds Section -->
+          <div class="booth-stage">
+            <div id="video-stage-grid" class="video-stage-grid layout-split">
+              <!-- Player 1: Local -->
+              <div class="video-card local-player-card">
+                <div class="video-wrapper">
+                  <video id="booth-local-video" autoplay playsinline muted></video>
+                  <div class="viewfinder-guide-overlay">
+                    <div class="vf-corner tl"></div>
+                    <div class="vf-corner tr"></div>
+                    <div class="vf-corner bl"></div>
+                    <div class="vf-corner br"></div>
+                    <div class="vf-center-plus">+</div>
+                    <span class="vf-guide-tag">AUTO-CENTER FOCUS ✨</span>
+                  </div>
+                  <div class="player-tag">
+                    <span class="role-badge">KAMU</span>
+                    <span id="local-player-name">Host</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Player 2: Remote / Partner -->
+              <div class="video-card remote-player-card">
+                <div class="video-wrapper">
+                  <video id="booth-remote-video" autoplay playsinline></video>
+                  <div class="viewfinder-guide-overlay">
+                    <div class="vf-corner tl"></div>
+                    <div class="vf-corner tr"></div>
+                    <div class="vf-corner bl"></div>
+                    <div class="vf-corner br"></div>
+                    <div class="vf-center-plus">+</div>
+                    <span class="vf-guide-tag">AUTO-CENTER FOCUS ✨</span>
+                  </div>
+                  <div id="remote-waiting-state" class="remote-waiting hidden">
+                    <div class="spinner-orbit"></div>
+                    <p>Menghubungkan video teman...</p>
+                  </div>
+                  <div class="player-tag">
+                    <span class="role-badge guest-badge">TEMAN</span>
+                    <span id="remote-player-name">Partner</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Middle Controls Bar (Emoji Reactions + Start Button in the empty space) -->
+            <div class="booth-middle-bar">
+              <!-- Floating Emoji Reactions Bar -->
+              <div class="emoji-reactions-bar">
+                <span class="reaction-title">Kirim Reaksi:</span>
+                <button class="emoji-btn" data-emoji="💖" title="Love">💖</button>
+                <button class="emoji-btn" data-emoji="✌️" title="Peace">✌️</button>
+                <button class="emoji-btn" data-emoji="🌸" title="Flower">🌸</button>
+                <button class="emoji-btn" data-emoji="⚡" title="Electric">⚡</button>
+                <button class="emoji-btn" data-emoji="🤪" title="Funny">🤪</button>
+                <button class="emoji-btn" data-emoji="😎" title="Cool">😎</button>
+                <button class="emoji-btn" data-emoji="📸" title="Camera">📸</button>
+              </div>
+
+              <!-- Start Capture Button placed in the empty space right under the camera -->
+              <div class="booth-start-box">
+                <button id="btn-start-capture" class="btn btn-giant btn-booth-start" title="Mulai Sesi Foto Sekarang">
+                  <span class="shutter-icon">📷</span>
+                  <span class="btn-text">MULAI SESI FOTO SEKARANG</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Emoji Floating Container -->
+            <div id="emoji-burst-container" class="emoji-burst-container"></div>
+          </div>
+
+          <!-- Frame Selector Section (Dynamic Slots!) -->
+          <div class="frame-selector-panel">
+            <div class="panel-header">
+              <div class="header-left">
+                <div class="header-title-row">
+                  <h3>🖼️ Pilih Desain Bingkai</h3>
+                  <span id="frame-mode-badge" class="frame-mode-badge badge-duo">👥 Duo (Landscape)</span>
+                </div>
+                <p id="frame-selector-subtitle">Bingkai landscape lebar khusus mode Duo agar foto berdua muat berdampingan tanpa terpotong</p>
+              </div>
+              
+              <!-- Frame Filter Tabs -->
+              <div class="frame-tabs">
+                <button class="frame-tab-btn active" data-filter="all">Semua</button>
+                <button class="frame-tab-btn" data-filter="pinterest">🔥 Pinterest Viral</button>
+                <button class="frame-tab-btn" data-filter="girl">🌸 Cewek</button>
+                <button class="frame-tab-btn" data-filter="boy">⚡ Cowok</button>
+                <button class="frame-tab-btn" data-filter="neutral">✨ Minimalist</button>
+              </div>
+            </div>
+
+            <!-- Frames Carousel / Grid -->
+            <div id="frames-carousel" class="frames-carousel">
+              <!-- Dynamically populated -->
+            </div>
+
+            <!-- Selected Frame Info Banner -->
+            <div class="frame-action-bar">
+              <div class="selected-frame-info">
+                <span class="info-label">BINGKAI AKTIF:</span>
+                <span id="active-frame-name" class="info-name">Lilac K-Cut 4-Frame</span>
+                <span id="active-frame-count-badge" class="badge-count">📸 4 Pose Foto</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- ============================================== -->
+        <!-- VIEW 3: COUNTDOWN & ACTIVE CAPTURE OVERLAY -->
+        <!-- ============================================== -->
+        <div id="capture-overlay" class="capture-overlay hidden">
+          <!-- 3A. Active Countdown HUD -->
+          <div id="countdown-hud" class="countdown-hud">
+            <div class="hud-top-progress">
+              <span id="capture-pose-step" class="step-label">Mengambil Foto 1 dari 4</span>
+              <div class="progress-bar-track">
+                <div id="capture-progress-fill" class="progress-bar-fill"></div>
+              </div>
+            </div>
+
+            <div class="countdown-center-circle">
+              <span id="countdown-number" class="countdown-number">3</span>
+            </div>
+
+            <div id="countdown-tip" class="countdown-tip">
+              Siap-siap pasang pose terbaikmu! ✨
+            </div>
+
+            <!-- Cancel Capture Button -->
+            <div class="hud-cancel-box">
+              <button id="btn-cancel-capture" class="btn btn-cancel-countdown" title="Batalkan Sesi Foto">
+                ✕ Batalkan Sesi Foto
+              </button>
+            </div>
+          </div>
+
+          <!-- 3B. Pose Preview Modal (Between Shots - Seen by Both Players) -->
+          <div id="pose-preview-hud" class="pose-preview-hud hidden">
+            <div class="preview-card-modal">
+              <div class="preview-card-header">
+                <div class="preview-badge-pill">
+                  <span class="preview-sparkle">✨</span>
+                  <span id="preview-pose-title">Pratinjau Foto Pose 1 dari 3</span>
+                </div>
+                <h3 class="preview-headline">Keren banget! Cek hasilnya dulu</h3>
+                <p id="preview-pose-subtitle" class="preview-subtitle">
+                  Lihat hasil fotomu bersama teman. Klik <b>Lanjutkan</b> jika sudah siap untuk pose berikutnya, atau <b>Foto Ulang</b> bila ingin ganti gaya.
+                </p>
+              </div>
+
+              <!-- Canvas Preview Display -->
+              <div class="preview-canvas-box">
+                <canvas id="pose-preview-canvas" class="pose-preview-canvas"></canvas>
+                <div class="preview-sync-badge">
+                  <span class="pulse-dot"></span>
+                  <span id="preview-sync-text">Pratinjau 2 Orang Sinkron</span>
+                </div>
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="preview-actions-row">
+                <button id="btn-retake-pose" class="btn btn-outline preview-retake-btn" title="Ambil ulang pose ini">
+                  <span>🔄 Foto Ulang Pose Ini</span>
+                </button>
+                <button id="btn-continue-pose" class="btn btn-primary preview-continue-btn" title="Lanjut ke pose berikutnya">
+                  <span id="continue-pose-btn-text">Lanjutkan ke Foto Berikutnya ➡️</span>
+                </button>
+              </div>
+
+              <div class="preview-cancel-box">
+                <button id="btn-cancel-from-preview" class="btn-cancel-countdown" title="Batalkan Sesi Foto">
+                  ✕ Batalkan Sesi Foto
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+
+        <!-- ============================================== -->
+        <!-- VIEW 4: RESULT STUDIO & EXPORT -->
+        <!-- ============================================== -->
+        <section id="view-result" class="view-section hidden">
+          <div class="result-header">
+            <div class="celebrate-pill">🎉 FOTO BERHASIL DICETAK!</div>
+            <h2>Strip Photobooth Kamu Sudah Jadi!</h2>
+            <p>Sesuaikan filter warna, tambahkan stiker aesthetic, dan download hasilnya dalam resolusi HD.</p>
+          </div>
+
+          <div class="result-workspace">
+            <!-- Left: Preview Canvas Output -->
+            <div class="canvas-preview-container">
+              <div class="strip-card-shadow">
+                <div id="canvas-wrapper" class="canvas-wrapper">
+                  <!-- Generated canvas rendered here -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: Editing & Customization Tools -->
+            <div class="result-tools-panel">
+              <!-- Filter Presets -->
+              <div class="tool-section">
+                <label class="tool-label">🎨 Pilih Filter Warna Foto</label>
+                <div class="filter-options-grid">
+                  <button class="filter-btn active" data-filter="normal">Normal</button>
+                  <button class="filter-btn" data-filter="vintage">Vintage 90s</button>
+                  <button class="filter-btn" data-filter="pastel">Pastel Dream</button>
+                  <button class="filter-btn" data-filter="bw">B&W Noir</button>
+                  <button class="filter-btn" data-filter="cyber">Cyber Neon</button>
+                  <button class="filter-btn" data-filter="glow">Y2K Flash</button>
+                </div>
+              </div>
+
+              <!-- Sticker Palettes & Position Editor -->
+              <div class="tool-section sticker-tool-container">
+                <div class="tool-section-header">
+                  <label class="tool-label">✨ Tempel & Geser Stiker Hiasan</label>
+                  <button id="btn-clear-stickers" class="btn-micro-text" title="Hapus semua stiker dari foto">Hapus Semua</button>
+                </div>
+
+                <!-- Drag Instruction Badge -->
+                <div class="sticker-drag-hint">
+                  <span class="hint-icon">👆</span>
+                  <span><strong>Bisa Digeser:</strong> Klik & tahan atau geser stiker langsung di atas foto untuk mengubah posisinya!</span>
+                </div>
+
+                <!-- Sticker Emoji Palette -->
+                <div class="stickers-palette">
+                  <button class="sticker-btn" data-emoji="🌸" title="Bunga Sakura">🌸</button>
+                  <button class="sticker-btn" data-emoji="💖" title="Hati Berkilau">💖</button>
+                  <button class="sticker-btn" data-emoji="✨" title="Kilau Bintang">✨</button>
+                  <button class="sticker-btn" data-emoji="🎀" title="Pita Ribbon">🎀</button>
+                  <button class="sticker-btn" data-emoji="⚡" title="Petir">⚡</button>
+                  <button class="sticker-btn" data-emoji="👾" title="Alien Retro">👾</button>
+                  <button class="sticker-btn" data-emoji="🦋" title="Kupu-kupu">🦋</button>
+                  <button class="sticker-btn" data-emoji="⭐" title="Bintang Emas">⭐</button>
+                  <button class="sticker-btn" data-emoji="🍓" title="Stroberi Manis">🍓</button>
+                  <button class="sticker-btn" data-emoji="🍒" title="Buah Ceri">🍒</button>
+                  <button class="sticker-btn" data-emoji="🧸" title="Boneka Beruang">🧸</button>
+                  <button class="sticker-btn" data-emoji="🐱" title="Kucing Imut">🐱</button>
+                  <button class="sticker-btn" data-emoji="👑" title="Mahkota">👑</button>
+                  <button class="sticker-btn" data-emoji="💌" title="Surat Cinta">💌</button>
+                  <button class="sticker-btn" data-emoji="🫧" title="Gelembung Sabun">🫧</button>
+                  <button class="sticker-btn" data-emoji="🕶️" title="Kacamata Hitam">🕶️</button>
+                </div>
+
+                <!-- Active Selected Sticker Adjustment Panel -->
+                <div id="sticker-active-editor" class="sticker-active-editor hidden">
+                  <div class="sticker-editor-header">
+                    <div class="sticker-editor-title">
+                      <span id="sticker-selected-badge" class="sticker-preview-badge">🌸</span>
+                      <div>
+                        <strong class="sticker-editor-heading">Atur Posisi Stiker</strong>
+                        <small id="sticker-selected-name" class="sticker-editor-sub">Geser di foto atau gunakan tombol arah</small>
+                      </div>
+                    </div>
+                    <button id="btn-delete-active-sticker" class="btn-icon-danger" title="Hapus stiker ini">🗑️ Hapus</button>
+                  </div>
+
+                  <!-- Direct Position D-Pad Nudge Buttons -->
+                  <div class="sticker-nudge-section">
+                    <span class="control-sublabel">Geser Arah Presisi:</span>
+                    <div class="dpad-container">
+                      <button id="btn-nudge-up" class="dpad-btn dpad-up" title="Geser ke Atas">▲</button>
+                      <div class="dpad-middle-row">
+                        <button id="btn-nudge-left" class="dpad-btn dpad-left" title="Geser ke Kiri">◀</button>
+                        <button id="btn-nudge-center" class="dpad-btn dpad-center" title="Pusatkan di Tengah">◎</button>
+                        <button id="btn-nudge-right" class="dpad-btn dpad-right" title="Geser ke Kanan">▶</button>
+                      </div>
+                      <button id="btn-nudge-down" class="dpad-btn dpad-down" title="Geser ke Bawah">▼</button>
+                    </div>
+                  </div>
+
+                  <!-- Size & Rotate Sliders -->
+                  <div class="sticker-sliders-grid">
+                    <div class="slider-control-group">
+                      <div class="slider-label-row">
+                        <span>Ukuran Stiker</span>
+                        <span id="label-sticker-size" class="slider-val-pill">48px</span>
+                      </div>
+                      <input type="range" id="input-sticker-size" min="24" max="110" step="2" value="48" />
+                    </div>
+                    <div class="slider-control-group">
+                      <div class="slider-label-row">
+                        <span>Putar / Rotasi</span>
+                        <span id="label-sticker-rotate" class="slider-val-pill">0°</span>
+                      </div>
+                      <div class="rotate-control-row">
+                        <button id="btn-rot-minus" class="btn-micro-adj" title="Putar Kiri -15°">↺ -15°</button>
+                        <input type="range" id="input-sticker-rotate" min="-180" max="180" step="5" value="0" />
+                        <button id="btn-rot-plus" class="btn-micro-adj" title="Putar Kanan +15°">+15° ↻</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Active Stickers Chips List -->
+                  <div class="active-stickers-chips-container">
+                    <span class="control-sublabel">Pilih Stiker di Foto:</span>
+                    <div id="stickers-chips-list" class="stickers-chips-list"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Custom Text Caption -->
+              <div class="tool-section">
+                <label class="tool-label">✍️ Teks Caption Bawah (Opsional)</label>
+                <input 
+                  type="text" 
+                  id="input-custom-caption" 
+                  placeholder="Contoh: Besties Forever 2026 ♡" 
+                  maxlength="40"
+                />
+              </div>
+
+              <!-- Action Download Buttons -->
+              <div class="tool-actions-box">
+                <button id="btn-download-strip" class="btn btn-giant btn-download">
+                  <span>💾 Unduh Strip Foto (HD PNG)</span>
+                </button>
+                
+                <div class="secondary-actions-row">
+                  <button id="btn-retake-photos" class="btn btn-outline">
+                    🔄 Foto Ulang (Retake)
+                  </button>
+                  <button id="btn-back-to-booth" class="btn btn-secondary">
+                    🖼️ Ganti Bingkai Lain
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </main>
+
+      <!-- ============================================== -->
+      <!-- MODAL: UPLOAD BINGKAI PINTEREST -->
+      <!-- ============================================== -->
+      <div id="modal-upload-pinterest" class="modal-overlay hidden">
+        <div class="modal-card">
+          <div class="modal-header">
+            <h3>📂 Upload Bingkai dari Pinterest</h3>
+            <button id="btn-close-modal" class="btn-close-modal" aria-label="Close">✕</button>
+          </div>
+          <div class="modal-body">
+            <p class="modal-desc">
+              Pilih file gambar bingkai (PNG transparan atau JPEG) yang sudah kamu download dari Pinterest.
+              Sistem akan otomatis menyesuaikan slot foto sesuai jumlah yang kamu tentukan!
+            </p>
+
+            <!-- Dropzone -->
+            <div id="pinterest-dropzone" class="dropzone">
+              <input type="file" id="input-pinterest-file" accept="image/*" class="file-input-hidden" />
+              <div class="dropzone-content">
+                <div class="dropzone-icon">🖼️</div>
+                <p>Klik atau Drag file bingkai ke sini</p>
+                <span class="file-format-hint">Mendukung PNG / JPG / WebP</span>
+              </div>
+              <img id="pinterest-preview-img" class="pinterest-preview-img hidden" alt="Preview Bingkai" />
+            </div>
+
+            <!-- Slot Settings -->
+            <div class="slot-config-grid">
+              <div class="config-item">
+                <label>Mau Berapa Foto di Bingkai Ini?</label>
+                <select id="select-slot-count">
+                  <option value="4" selected>4 Foto (Strip Panjang)</option>
+                  <option value="3">3 Foto (Trio Cut)</option>
+                  <option value="2">2 Foto (Duo Cut)</option>
+                  <option value="1">1 Foto (Single Besar)</option>
+                </select>
+              </div>
+
+              <div class="config-item">
+                <label>Susunan Layout Foto:</label>
+                <select id="select-slot-layout">
+                  <option value="vertical" selected>Strip Vertikal (Atas-Bawah)</option>
+                  <option value="grid">Grid 2x2 (Khusus 4 Foto)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button id="btn-cancel-upload" class="btn btn-secondary">Batal</button>
+            <button id="btn-apply-pinterest-frame" class="btn btn-primary" disabled>
+              Terapkan Bingkai Ini ✨
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toast Notification Container -->
+      <div id="toast-container" class="toast-container"></div>
+
+    </div>
+
+    <!-- Script Entry -->
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
