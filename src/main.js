@@ -80,7 +80,8 @@ const el = {
   selectCameraBooth: document.getElementById('select-camera-booth'),
   btnSwitchCamBooth: document.getElementById('btn-switch-cam-booth'),
   labelSwitchCamBooth: document.getElementById('label-switch-cam-booth'),
-   btnLayoutSplit: document.getElementById('btn-layout-split'),
+  btnFlipCamBooth: document.getElementById('btn-flip-cam-booth'),
+  btnLayoutSplit: document.getElementById('btn-layout-split'),
   btnLayoutPip: document.getElementById('btn-layout-pip'),
   layoutToggleGroup: document.getElementById('layout-toggle-group'),
   btnLeaveRoom: document.getElementById('btn-leave-room'),
@@ -252,7 +253,17 @@ async function populateCameraList() {
 
 async function switchCamera(deviceId) {
   state.selectedCameraId = deviceId;
-  await startCamera(deviceId);
+  const dev = state.availableCameras.find(d => d.deviceId === deviceId);
+  let facing = null;
+  if (dev && dev.label) {
+    const l = dev.label.toLowerCase();
+    if (l.includes('back') || l.includes('rear') || l.includes('belakang') || l.includes('environment')) {
+      facing = 'environment';
+    } else if (l.includes('front') || l.includes('user') || l.includes('depan') || l.includes('selfie')) {
+      facing = 'user';
+    }
+  }
+  await startCamera(deviceId, facing);
   if (el.selectCameraLobby) el.selectCameraLobby.value = deviceId;
   if (el.selectCameraBooth) el.selectCameraBooth.value = deviceId;
   showToast('Kamera berhasil dialihkan! 📷');
@@ -355,6 +366,15 @@ async function startCamera(deviceId = null, facingMode = null) {
         }
         if (settings.facingMode) {
           state.facingMode = settings.facingMode;
+          if (settings.facingMode === 'environment') {
+            state.isMirrored = false;
+            el.lobbyVideo?.classList.add('unmirror');
+            el.boothLocalVideo?.classList.add('unmirror');
+          } else if (settings.facingMode === 'user') {
+            state.isMirrored = true;
+            el.lobbyVideo?.classList.remove('unmirror');
+            el.boothLocalVideo?.classList.remove('unmirror');
+          }
         }
       }
     }
@@ -425,18 +445,23 @@ function bindEvents() {
     startCamera();
   });
 
-  // Camera Mirror
-  el.btnFlipCam.addEventListener('click', () => {
+  // Camera Mirror (Lobby & Booth)
+  const handleToggleMirror = () => {
     sounds.playPop();
     state.isMirrored = !state.isMirrored;
     if (state.isMirrored) {
-      el.lobbyVideo.classList.remove('unmirror');
-      el.boothLocalVideo.classList.remove('unmirror');
+      el.lobbyVideo?.classList.remove('unmirror');
+      el.boothLocalVideo?.classList.remove('unmirror');
+      showToast('Kamera Mirror: Aktif (Selfie) 🪞');
     } else {
-      el.lobbyVideo.classList.add('unmirror');
-      el.boothLocalVideo.classList.add('unmirror');
+      el.lobbyVideo?.classList.add('unmirror');
+      el.boothLocalVideo?.classList.add('unmirror');
+      showToast('Kamera Mirror: Nonaktif (Normal) 📷');
     }
-  });
+  };
+
+  if (el.btnFlipCam) el.btnFlipCam.addEventListener('click', handleToggleMirror);
+  if (el.btnFlipCamBooth) el.btnFlipCamBooth.addEventListener('click', handleToggleMirror);
 
   // --- Host Room Creation ---
   el.btnCreateRoom.addEventListener('click', async () => {
@@ -1237,21 +1262,80 @@ function spawnFloatingEmoji(emoji) {
   setTimeout(() => burst.remove(), 2000);
 }
 
+// --- Helper: Check if video element is visually mirrored on screen ---
+function isVideoElementMirrored(videoEl) {
+  if (!videoEl) return false;
+  // If explicitly unmirrored via CSS class
+  if (videoEl.classList && videoEl.classList.contains('unmirror')) {
+    return false;
+  }
+  // Check computed transform (e.g. scaleX(-1) becomes matrix(-1, 0, 0, 1, 0, 0))
+  try {
+    const st = window.getComputedStyle(videoEl);
+    const tr = st.transform || st.webkitTransform;
+    if (tr && tr !== 'none') {
+      const match = tr.match(/^matrix\(([^,]+)/);
+      if (match) {
+        return parseFloat(match[1]) < 0;
+      }
+    }
+  } catch (_) {}
+
+  // Fallback: local video follows state.isMirrored, remote video in video-card defaults to mirrored
+  if (videoEl === el.boothLocalVideo) {
+    return !!state.isMirrored;
+  }
+  return true;
+}
+
 // --- Helper: Video Snapshot Creator ---
 function createSnapshotCanvas(videoEl) {
   if (!videoEl || videoEl.videoWidth === 0) return null;
+
+  const vW = videoEl.videoWidth;
+  const vH = videoEl.videoHeight;
+
+  // Match the CSS object-fit: cover + object-position: center 20% behaviour.
+  // The display container has a 4:3 aspect ratio, so we crop the raw video stream
+  // the same way the browser does before capturing the frame.
+  const displayAspect = 4 / 3;
+  const videoAspect = vW / vH;
+
+  let srcX = 0, srcY = 0, srcW = vW, srcH = vH;
+
+  if (videoAspect > displayAspect) {
+    // Video is wider than 4:3 — crop sides, keep center horizontally
+    srcH = vH;
+    srcW = vH * displayAspect;
+    srcX = (vW - srcW) / 2; // center X
+    // object-position: 20% vertically means top of face region is ~20% into frame
+    srcY = 0; // start from top since 20% positions the object from top
+  } else {
+    // Video is taller than 4:3 — crop top/bottom, align to 20% from top
+    srcW = vW;
+    srcH = vW / displayAspect;
+    // object-position: center 20% — 20% vertical offset from top
+    const maxSrcY = vH - srcH;
+    srcY = maxSrcY * 0.20; // 20% offset to show face rather than ceiling
+  }
+
+  // Output canvas: fixed 1280×960 (4:3 HD) so quality is consistent
+  const OUT_W = 1280;
+  const OUT_H = 960;
   const offscreen = document.createElement('canvas');
-  offscreen.width = videoEl.videoWidth || 1280;
-  offscreen.height = videoEl.videoHeight || 720;
+  offscreen.width = OUT_W;
+  offscreen.height = OUT_H;
   const offCtx = offscreen.getContext('2d');
 
-  // Preserve mirror orientation if enabled
-  if (state.isMirrored && videoEl === el.boothLocalVideo) {
-    offCtx.translate(offscreen.width, 0);
+  // Preserve exact mirror orientation matching the on-screen video view
+  // (Whether local or remote, snapshot horizontal orientation matches the live view 100%)
+  if (isVideoElementMirrored(videoEl)) {
+    offCtx.translate(OUT_W, 0);
     offCtx.scale(-1, 1);
   }
 
-  offCtx.drawImage(videoEl, 0, 0, offscreen.width, offscreen.height);
+  // Draw the cropped region scaled to our output canvas
+  offCtx.drawImage(videoEl, srcX, srcY, srcW, srcH, 0, 0, OUT_W, OUT_H);
 
   // Kick off native face detection (async, result cached on canvas for drawImageSmart to use)
   detectFacesAsync(offscreen);
@@ -1297,7 +1381,7 @@ function interruptibleSleep(ms) {
   });
 }
 
-// Draw snapshot preview onto pose preview canvas
+// Draw snapshot preview onto pose preview canvas (matches live booth view exactly)
 function drawPosePreviewCanvas(canvas, localImg, remoteImg, layoutMode, pipSwapped = false) {
   if (!canvas) return;
   const w = 720;
@@ -1306,14 +1390,39 @@ function drawPosePreviewCanvas(canvas, localImg, remoteImg, layoutMode, pipSwapp
   canvas.height = h;
   const ctx = canvas.getContext('2d');
 
-  // Fill dark chic backdrop
+  // Helper: draw image filling target area exactly (simple cover - no repositioning)
+  // Since the snapshot canvas is already cropped to 4:3 matching the live view,
+  // we just stretch it to fill — this produces the exact same result as the live video.
+  function drawSimpleCover(img, x, y, tw, th) {
+    if (!img) return;
+    const iw = img.naturalWidth || img.width;
+    const ih = img.naturalHeight || img.height;
+    if (!iw || !ih) return;
+
+    const targetAspect = tw / th;
+    const imgAspect = iw / ih;
+
+    let sx = 0, sy = 0, sw = iw, sh = ih;
+    if (imgAspect > targetAspect) {
+      // wider — crop sides
+      sw = ih * targetAspect;
+      sx = (iw - sw) / 2;
+    } else {
+      // taller — crop top/bottom from center
+      sh = iw / targetAspect;
+      sy = (ih - sh) / 2;
+    }
+    ctx.drawImage(img, sx, sy, sw, sh, x, y, tw, th);
+  }
+
+  // Fill dark backdrop
   ctx.fillStyle = '#090d16';
   ctx.fillRect(0, 0, w, h);
 
   if (remoteImg && layoutMode === 'side-by-side') {
     const halfW = w / 2;
-    stripRenderer.drawImageCover(ctx, localImg, 0, 0, halfW, h, 0);
-    stripRenderer.drawImageCover(ctx, remoteImg, halfW, 0, halfW, h, 0);
+    drawSimpleCover(localImg, 0, 0, halfW, h);
+    drawSimpleCover(remoteImg, halfW, 0, halfW, h);
 
     // Subtle divider
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
@@ -1325,20 +1434,17 @@ function drawPosePreviewCanvas(canvas, localImg, remoteImg, layoutMode, pipSwapp
 
     // Player indicator tags
     ctx.save();
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
-    ctx.beginPath();
-    ctx.roundRect(14, 14, 76, 26, 6);
-    ctx.fill();
-    ctx.fillStyle = '#38bdf8';
     ctx.font = 'bold 12px "Plus Jakarta Sans", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
+    ctx.beginPath(); ctx.roundRect(14, 14, 76, 26, 6); ctx.fill();
+    ctx.fillStyle = '#38bdf8';
     ctx.fillText('KAMU', 52, 27);
 
     ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
-    ctx.beginPath();
-    ctx.roundRect(halfW + 14, 14, 88, 26, 6);
-    ctx.fill();
+    ctx.beginPath(); ctx.roundRect(halfW + 14, 14, 88, 26, 6); ctx.fill();
     ctx.fillStyle = '#f472b6';
     ctx.fillText('TEMAN', halfW + 58, 27);
     ctx.restore();
@@ -1349,7 +1455,8 @@ function drawPosePreviewCanvas(canvas, localImg, remoteImg, layoutMode, pipSwapp
     const mainTag = pipSwapped ? 'TEMAN' : 'KAMU';
     const mainTagColor = pipSwapped ? '#f472b6' : '#38bdf8';
 
-    stripRenderer.drawImageCover(ctx, mainImg, 0, 0, w, h, 0);
+    drawSimpleCover(mainImg, 0, 0, w, h);
+
     const pipW = w * 0.36;
     const pipH = h * 0.36;
     const pipX = w - pipW - 16;
@@ -1358,35 +1465,33 @@ function drawPosePreviewCanvas(canvas, localImg, remoteImg, layoutMode, pipSwapp
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 3;
     ctx.strokeRect(pipX, pipY, pipW, pipH);
-    stripRenderer.drawImageCover(ctx, insetImg, pipX, pipY, pipW, pipH, 6);
+    ctx.save();
+    ctx.beginPath(); ctx.roundRect(pipX, pipY, pipW, pipH, 6); ctx.clip();
+    drawSimpleCover(insetImg, pipX, pipY, pipW, pipH);
+    ctx.restore();
 
     ctx.save();
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
-    ctx.beginPath();
-    ctx.roundRect(14, 14, 76, 26, 6);
-    ctx.fill();
-    ctx.fillStyle = mainTagColor;
     ctx.font = 'bold 12px "Plus Jakarta Sans", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
+    ctx.beginPath(); ctx.roundRect(14, 14, 76, 26, 6); ctx.fill();
+    ctx.fillStyle = mainTagColor;
     ctx.fillText(mainTag, 52, 27);
     ctx.restore();
 
   } else {
-    // Single / Solo Mode
+    // Solo Mode
     const img = localImg || remoteImg;
-    if (img) {
-      stripRenderer.drawImageCover(ctx, img, 0, 0, w, h, 0);
-    }
+    if (img) drawSimpleCover(img, 0, 0, w, h);
+
     ctx.save();
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
-    ctx.beginPath();
-    ctx.roundRect(14, 14, 76, 26, 6);
-    ctx.fill();
-    ctx.fillStyle = '#38bdf8';
     ctx.font = 'bold 12px "Plus Jakarta Sans", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
+    ctx.beginPath(); ctx.roundRect(14, 14, 76, 26, 6); ctx.fill();
+    ctx.fillStyle = '#38bdf8';
     ctx.fillText('KAMU', 52, 27);
     ctx.restore();
   }
