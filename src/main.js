@@ -1269,12 +1269,12 @@ function isVideoElementMirrored(videoEl) {
   if (videoEl.classList && videoEl.classList.contains('unmirror')) {
     return false;
   }
-  // Check computed transform (e.g. scaleX(-1) becomes matrix(-1, 0, 0, 1, 0, 0))
+  // Check computed transform (matrix or matrix3d for GPU-accelerated video)
   try {
     const st = window.getComputedStyle(videoEl);
     const tr = st.transform || st.webkitTransform;
     if (tr && tr !== 'none') {
-      const match = tr.match(/^matrix\(([^,]+)/);
+      const match = tr.match(/^matrix(?:3d)?\(([^,]+)/);
       if (match) {
         return parseFloat(match[1]) < 0;
       }
@@ -1282,8 +1282,8 @@ function isVideoElementMirrored(videoEl) {
   } catch (_) {}
 
   // Fallback: local video follows state.isMirrored, remote video in video-card defaults to mirrored
-  if (videoEl === el.boothLocalVideo) {
-    return !!state.isMirrored;
+  if (videoEl === el.boothLocalVideo || videoEl === el.lobbyVideo) {
+    return state.isMirrored !== false;
   }
   return true;
 }
