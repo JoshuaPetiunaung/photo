@@ -1265,10 +1265,6 @@ function spawnFloatingEmoji(emoji) {
 // --- Helper: Check if video element is visually mirrored on screen ---
 function isVideoElementMirrored(videoEl) {
   if (!videoEl) return false;
-  // Remote partner video is never mirrored (shown naturally face-to-face as what appears on their device)
-  if (videoEl === el.boothRemoteVideo) {
-    return false;
-  }
   // If explicitly unmirrored via CSS class
   if (videoEl.classList && videoEl.classList.contains('unmirror')) {
     return false;
@@ -1285,11 +1281,12 @@ function isVideoElementMirrored(videoEl) {
     }
   } catch (_) {}
 
-  // Local video follows state.isMirrored
+  // In photobooth, both local and remote selfie streams are mirrored by default unless state.isMirrored is false for local video
   if (videoEl === el.boothLocalVideo || videoEl === el.lobbyVideo) {
     return state.isMirrored !== false;
   }
-  return false;
+  // Remote video inside video-card is mirrored by default
+  return true;
 }
 
 // --- Helper: Video Snapshot Creator ---
